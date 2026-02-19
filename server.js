@@ -85,4 +85,8 @@ Keep it professional but commercially aware.
   }
 });
 
-app.listen(3500, () => console.log('Server running on http://localhost:3500'));
+const PORT = process.env.PORT || 3500;
+
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
