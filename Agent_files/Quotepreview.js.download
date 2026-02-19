@@ -1,0 +1,242 @@
+﻿var enquiryConfirmation = document.getElementById("EnquiryConfirmation");
+var cruiseLocations = {};
+var accommodationLongitude = "";
+var accommodationLatitude = "";
+var isInitialLoad = true; // ✅ prevent initial scroll
+
+if (enquiryConfirmation) {
+    enquiryConfirmation.style.display = "none";
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    openSection("Accommodation");
+
+    // Manually set active class WITHOUT focus or scroll
+    var defaultBtn = document.getElementById("defaultOpen");
+    if (defaultBtn) {
+        defaultBtn.classList.add("active");
+    }
+
+    // Force scroll back to top (extra protection)
+    window.scrollTo(0, 0);
+});
+
+$(".cruise-itinerary-details").each(function (i) {
+    const val = $(this).val().split("||");
+    cruiseLocations[i] = val.reduce(function (r, e, i) {
+        if (i % 2) r[val[i - 1]] = e;
+        return r;
+    }, {});
+});
+
+function CallWebService() {
+    var replyAddress = document.getElementById("HFReplyAddress").value;
+    var quoteId = document.getElementById("HFQuoteId").value;
+    var choice = "";
+    var antirbt = document.getElementById("antirbt").value;
+    var enquiryForm = document.getElementById("EnquiryForm");
+    var enquiryConfirmation = document.getElementById("EnquiryConfirmation");
+    var rd = document.getElementsByName("rdfeedback");
+    var feedback = document.getElementById("TAfeedback").value;
+    var crmurl = document.getElementById("HFCRMURL").value;
+    var serviceUrl = "Services/QuoteFeedbackService.asmx/PostQuoteFeedback";
+    var vid = document.getElementById("HFVID").value;
+    let profile = document.getElementById("HFProfile").value;
+
+    enquiryForm.style.display = "none";
+    enquiryConfirmation.style.display = "block";
+
+    for (var i = 0; i < rd.length; i++) {
+        if (rd[i].checked)
+            choice = rd[i].value;
+    }
+
+    if (antirbt === "") {
+        $.post({
+            url: crmurl + serviceUrl,
+            data: {
+                quoteId: quoteId,
+                replyAddress: replyAddress,
+                crmurl: crmurl,
+                choice: choice,
+                feedback: feedback,
+                vid: vid,
+                profile: profile
+            },
+            success: function () { },
+            error: function () {
+                alert("there was an error");
+            }
+        });
+    }
+}
+
+function openSection(sectionName, evt = null) {
+
+    // Hide all tab content
+    var tabcontent = document.getElementsByClassName("tab-content");
+    for (var i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+    }
+
+    // Remove active class from buttons
+    var tablinks = document.getElementsByClassName("tab-link");
+    for (var i = 0; i < tablinks.length; i++) {
+        tablinks[i].classList.remove("active");
+    }
+
+    // Show selected tab
+    var section = document.getElementById(sectionName);
+    if (section) {
+        section.style.display = "block";
+    }
+
+    // Only set active class if triggered by click
+    if (evt && evt.currentTarget) {
+        evt.currentTarget.classList.add("active");
+    }
+}
+
+function initMap() {
+
+    if ($("#accommodationLongitude").length && $("#accommodationLatitude").length) {
+        accommodationLatitude = $("#accommodationLatitude").val();
+        accommodationLongitude = $("#accommodationLongitude").val();
+        initAccommodationMap();
+    } else {
+        $("#accommodationMap").hide();
+    }
+
+    if (Object.keys(cruiseLocations).length !== 0) {
+
+        const stops = Object.keys(cruiseLocations).length;
+        const theMiddle = Math.floor(stops / 2);
+        let centrelong = cruiseLocations[theMiddle].Longitude;
+        let marker;
+        let bounds = new google.maps.LatLngBounds();
+
+        if (centrelong !== "") {
+
+            const map = new google.maps.Map(
+                document.getElementById("map"),
+                {
+                    streetViewControl: true
+                }
+            );
+
+            for (let i = 0; i < stops; i++) {
+
+                marker = new google.maps.Marker({
+                    position: new google.maps.LatLng(
+                        cruiseLocations[i].Latitude,
+                        cruiseLocations[i].Longitude
+                    ),
+                    map: map,
+                    title: cruiseLocations[i].Name,
+                    label: { text: cruiseLocations[i].Day, color: "white" }
+                });
+
+                const infowindow = new google.maps.InfoWindow({
+                    content: cruiseLocations[i].Name
+                });
+
+                google.maps.event.addListener(marker, "mouseover", (function (marker, i) {
+                    return function () {
+                        infowindow.setContent(cruiseLocations[i].Name);
+                        infowindow.open(map, marker);
+                    };
+                })(marker, i));
+
+                google.maps.event.addListener(marker, "mouseout", function () {
+                    infowindow.close();
+                });
+
+                bounds.extend(marker.position);
+            }
+
+            map.fitBounds(bounds);
+        } else {
+            $("#map").hide();
+            $("#TitlePortsOfCall").hide();
+        }
+    }
+}
+
+function initAccommodationMap() {
+
+    let accommodationMap = new google.maps.Map(
+        document.getElementById("accommodationMap"),
+        {
+            center: new google.maps.LatLng(accommodationLatitude, accommodationLongitude),
+            zoom: 8
+        }
+    );
+
+    const marker = new google.maps.Marker({
+        position: new google.maps.LatLng(accommodationLatitude, accommodationLongitude),
+        map: accommodationMap
+    });
+
+    const infowindow = new google.maps.InfoWindow({
+        content: '<div id="content">' + (typeof accommodationName !== "undefined" ? accommodationName : "") + "</div>"
+    });
+
+    infowindow.open(accommodationMap, marker);
+}
+
+var sliderObjects = [];
+
+$(document).ready(function () {
+    createSliderObjects();
+    isInitialLoad = false; // ✅ enable scroll after initial render
+});
+
+function plusDivs(arrow, n) {
+
+    var container = $(arrow).closest('.grid-container-slider');
+    var sliderDiv = container.find('.slider')[0];
+    if (!sliderDiv) return;
+
+    var matchedDiv = sliderObjects.find(s => s.id === sliderDiv.id);
+    if (!matchedDiv) return;
+
+    showDivs(matchedDiv, matchedDiv.slideIndex + n);
+
+    // ✅ Scroll ONLY when user clicks arrows
+    matchedDiv.slideContents[matchedDiv.slideIndex - 1]
+        .scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function createSliderObjects() {
+
+    $('.slider').each(function (i, sliderDiv) {
+
+        var obj = {
+            id: sliderDiv.id,
+            divContent: sliderDiv,
+            slideIndex: 1,
+            slideContents: $(sliderDiv).find('.mySlides').toArray()
+        };
+
+        showDivs(obj, 1);
+        sliderObjects.push(obj);
+    });
+}
+
+function showDivs(divObject, n) {
+
+    if (n > divObject.slideContents.length) {
+        divObject.slideIndex = 1;
+    } else if (n < 1) {
+        divObject.slideIndex = divObject.slideContents.length;
+    } else {
+        divObject.slideIndex = n;
+    }
+
+    for (var i = 0; i < divObject.slideContents.length; i++) {
+        divObject.slideContents[i].style.display = 'none';
+    }
+
+    divObject.slideContents[divObject.slideIndex - 1].style.display = 'block';
+}
